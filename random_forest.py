@@ -164,11 +164,11 @@ for index, row in new_data_from_csv.iterrows():
     warehouseID = row['warehouseID']
     companyName = row['companyName']
 
-    original_warehouseID = warehouse_encoder.inverse_transform([[warehouseID]])[0]
-    original_companyName = company_encoder.inverse_transform([[companyName]])[0]
+    original_warehouseID = warehouse_encoder.inverse_transform([warehouseID])[0]
+    original_companyName = company_encoder.inverse_transform([companyName])[0]
     
     # Make a prediction for the current row
     prediction = rf.predict([new_data_to_predict[index]])
 
     # Print the prediction
-    print(f'Prediction for week {row["week"]} of year {row["year"]}, warehouse {warehouseID} and company {companyName}: {prediction[0]}')
+    print(f'Prediction for week {row["week"]} of year {row["year"]}, warehouse {original_warehouseID} and company {original_companyName}: {prediction[0]}')
