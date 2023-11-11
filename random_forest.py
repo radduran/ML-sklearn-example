@@ -54,10 +54,10 @@ def prepare_category_map(data):
         mapping[original_col] = {value: data[data[col] == value][original_col].iloc[0] for value in unique_encoded_values}
     return mapping
 
-
 def get_original_value(map, column, encoded_value):
     return map[column][encoded_value]
 
+
 def get_data(filename, to_learn=True):
     # Load the data
     csv_cols=["week", "year", "companyName", "warehouseID"]
@@ -78,7 +78,6 @@ def get_data(filename, to_learn=True):
         warehouse_encoder.fit(data['warehouseID'])
         data['companyName'] = company_encoder.transform(data['companyName'])
         data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
-        
         joblib.dump(company_encoder, 'company_encoder.pkl')
         joblib.dump(warehouse_encoder, 'warehouse_encoder.pkl')
 
@@ -88,92 +87,10 @@ def get_data(filename, to_learn=True):
         # Load the encoders
         company_encoder = joblib.load('company_encoder.pkl')
         warehouse_encoder = joblib.load('warehouse_encoder.pkl')
-
         # Transform the data with the encoders
         data['companyName'] = company_encoder.transform(data['companyName'])
         data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
 
-    return data, company_encoder, warehouse_encoder
-
-def get_features_target(data, to_learn=True):
-    print('get feature and target')
-    # Prepare data features (inputs) and output(target)
-def get_data(filename, to_learn=True):
-    # Load the data
-    csv_cols=["week", "year", "companyName", "warehouseID"]
-    if to_learn:
-        csv_cols.append("count")    
-    # load CSV
-    print('load the data')
-    data = pd.read_csv(filename, header=None, names=csv_cols, dtype={"companyName": str})
-
-
-    # Initialize the encoders
-    company_encoder = LabelEncoder()
-    warehouse_encoder = LabelEncoder()
-
-    # Fit and transform the data with the encoders
-    if to_learn:
-        company_encoder.fit(data['companyName'])
-        warehouse_encoder.fit(data['warehouseID'])
-        data['companyName'] = company_encoder.transform(data['companyName'])
-        data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
-        
-        joblib.dump(company_encoder, 'company_encoder.pkl')
-        joblib.dump(warehouse_encoder, 'warehouse_encoder.pkl')
-
-
-    # If not to_learn, it means we are preparing the data for prediction
-    else:
-        # Load the encoders
-        company_encoder = joblib.load('company_encoder.pkl')
-        warehouse_encoder = joblib.load('warehouse_encoder.pkl')
-
-        # Transform the data with the encoders
-        data['companyName'] = company_encoder.transform(data['companyName'])
-        data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
-
-    return data, company_encoder, warehouse_encoder
-
-def get_features_target(data, to_learn=True):
-    print('get feature and target')
-    # Prepare data features (inputs) and output(target)
-    features = data[["week", "year"] + list(data.columns[5:])].values
-    target = None
-    if to_learn:
-        target = data["count"]
-        
-    return features, target
-def get_data(filename, to_learn=True):
-    # Load the data
-    csv_cols=["week", "year", "companyName", "warehouseID"]
-    if to_learn:
-        csv_cols.append("count")    
-    # load CSV
-    print('load the data')
-    data = pd.read_csv(filename, header=None, names=csv_cols, dtype={"companyName": str})
-
-
-    # Initialize the encoders
-    company_encoder = LabelEncoder()
-    warehouse_encoder = LabelEncoder()
-
-    # Fit and transform the data with the encoders
-    if to_learn:
-        company_encoder.fit(data['companyName'])
-        warehouse_encoder.fit(data['warehouseID'])
-        
-        joblib.dump(company_encoder, 'company_encoder.pkl')
-        joblib.dump(warehouse_encoder, 'warehouse_encoder.pkl')
-    # If not to_learn, it means we are preparing the data for prediction
-    else:
-        # Load the encoders
-        company_encoder = joblib.load('company_encoder.pkl')
-        warehouse_encoder = joblib.load('warehouse_encoder.pkl')
-
-    # Transform the data with the encoders
-    data['companyName'] = company_encoder.transform(data['companyName'])
-    data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
     return data
 
 def get_features_target(data, to_learn=True):
@@ -186,11 +103,6 @@ def get_features_target(data, to_learn=True):
         
     return features, target
 
-    target = None
-    if to_learn:
-        target = data["count"]
-        
-    return features, target
 
 def get_train_test(features, target):
     # Split the data into training and validation sets (I set to 20% for validation)
@@ -228,7 +140,7 @@ X_train, X_test, y_train, y_test = get_train_test(features, target)
 
 # do the magic measuring the time, later we can use this to compare with other estimators
 with Timer():
-    rf = get_model(X_train, y_train, estimators=500, override=True)
+    rf = get_model(X_train, y_train, estimators=500)
 
 # Evaluate the model
 predictions = rf.predict(X_test)
@@ -242,5 +154,7 @@ print('-------------------------------------------------------------------------
 # Set the new data to predict
 new_data_from_csv = get_data('to_predict.csv', to_learn=False)
 new_data_to_predict, _ = get_features_target(new_data_from_csv, to_learn=False)
+
+
 new_prediction = rf.predict(new_data_to_predict)
 print(f'prediction for 2024 week 1: {new_prediction}')
