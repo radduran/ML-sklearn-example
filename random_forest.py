@@ -8,7 +8,6 @@ import joblib
 import time
 
 
-
 # timer to measure fit time
 class Timer:
     def __enter__(self):
@@ -18,55 +17,22 @@ class Timer:
     def __exit__(self, *args):
         self.end = time.monotonic()
         self.interval = self.end - self.start
-        print(f"Elapsed time: {self.interval/60:.2f} minutes")
+
+    def __str__(self):
+        if self.interval > 60:
+            return f"{self.interval/60:.2f} minutes"
+        return f"{self.interval:.2f} seconds"
 
 
-
-def prepare_new_data(category_map, week, year, companyName, warehouseID):
-    # Initialize a new DataFrame with the same columns as the training data
-    new_data = pd.DataFrame(columns=data.columns)
-
-    # Set the week and year
-    new_data['week'] = [week]
-    new_data['year'] = [year]
-
-    # Set the one-hot encoded columns
-    for column, mapping in category_map.items():
-        # Get the encoded value for the company name and warehouse ID
-        encoded_companyName = get_original_value(mapping, 'companyName', companyName)
-        encoded_warehouseID = get_original_value(mapping, 'warehouseID', warehouseID)
-
-        # Set the corresponding columns in the new data
-        new_data[f'{column}_{encoded_companyName}'] = 1
-        new_data[f'{column}_{encoded_warehouseID}'] = 1
-
-    return new_data
-
-def prepare_category_map(data):
-    # Extract the columns that were one-hot encoded
-    encoded_columns = [col for col in data.columns if col.startswith("companyName_") or col.startswith("warehouseID_")]
-
-    # Create a mapping for each encoded column
-    mapping = {}
-    for col in encoded_columns:
-        original_col = col.split('_')[0]  # Get the original column name
-        unique_encoded_values = data[col].unique()  # Get unique encoded values
-        mapping[original_col] = {value: data[data[col] == value][original_col].iloc[0] for value in unique_encoded_values}
-    return mapping
-
-def get_original_value(map, column, encoded_value):
-    return map[column][encoded_value]
-
-
-def get_data(filename, to_learn=True):
+def get_csv_data(filename, to_learn=True):
     # Load the data
-    csv_cols=["week", "year", "companyName", "warehouseID"]
+    csv_cols = ["week", "year", "companyName", "warehouseID"]
     if to_learn:
-        csv_cols.append("count")    
+        csv_cols.append("count")
     # load CSV
-    print('load the data')
-    data = pd.read_csv(filename, header=None, names=csv_cols, dtype={"companyName": str})
-
+    data = pd.read_csv(
+        filename, header=None, names=csv_cols, dtype={"companyName": str}
+    )
 
     # Initialize the encoders
     company_encoder = LabelEncoder()
@@ -74,101 +40,142 @@ def get_data(filename, to_learn=True):
 
     # Fit and transform the data with the encoders
     if to_learn:
-        company_encoder.fit(data['companyName'])
-        warehouse_encoder.fit(data['warehouseID'])
-        data['companyName'] = company_encoder.transform(data['companyName'])
-        data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
-        joblib.dump(company_encoder, 'company_encoder.pkl')
-        joblib.dump(warehouse_encoder, 'warehouse_encoder.pkl')
-
+        company_encoder.fit(data["companyName"])
+        warehouse_encoder.fit(data["warehouseID"])
+        data["companyName"] = company_encoder.transform(data["companyName"])
+        data["warehouseID"] = warehouse_encoder.transform(data["warehouseID"])
+        joblib.dump(company_encoder, "company_encoder.pkl")
+        joblib.dump(warehouse_encoder, "warehouse_encoder.pkl")
 
     # If not to_learn, it means we are preparing the data for prediction
     else:
         # Load the encoders
-        company_encoder = joblib.load('company_encoder.pkl')
-        warehouse_encoder = joblib.load('warehouse_encoder.pkl')
+        company_encoder = joblib.load("company_encoder.pkl")
+        warehouse_encoder = joblib.load("warehouse_encoder.pkl")
         # Transform the data with the encoders
-        data['companyName'] = company_encoder.transform(data['companyName'])
-        data['warehouseID'] = warehouse_encoder.transform(data['warehouseID'])
+        data["companyName"] = company_encoder.transform(data["companyName"])
+        data["warehouseID"] = warehouse_encoder.transform(data["warehouseID"])
 
     return data
 
+
 def get_features_target(data, to_learn=True):
-    print('get feature and target')
     # Prepare data features (inputs) and output(target)
-    features = data[["week", "year","companyName","warehouseID"]].values
+    features = data[["week", "year", "companyName", "warehouseID"]].values
     if not to_learn:
         return features, None
-    return features,  data["count"]
-
+    return features, data["count"]
 
 
 def get_train_test(features, target):
     # Split the data into training and validation sets (I set to 20% for validation)
-    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=83)
+    X_train, X_test, y_train, y_test = train_test_split(
+        features, target, test_size=0.2, random_state=83
+    )
     return X_train, X_test, y_train, y_test
+
 
 def get_model(X_train, y_train, estimators=2, override=False):
     # if model already exists, load it
     if not override:
         try:
-            return joblib.load(f'model.pkl_{estimators}')
+            model= joblib.load(f"model.pkl_{estimators}")
+            return model
         except:
-            print('model not found, creating a new one')
-    
+            print("model not found, creating a new one")
+
     # Initialize the Random Forest regressor
     rf = RandomForestRegressor(n_estimators=estimators, random_state=42)
-    print('running model fit')
+    print("running model fit")
     # Train the model
     with Timer():
         rf.fit(X_train, y_train)
-    print('finish fit')
-    
+    print("finish fit")
+
     # save model
-    joblib.dump(rf, f'model.pkl_{estimators}')
+    joblib.dump(rf, f"model.pkl_{estimators}")
     return rf
 
-# get data from CSV
-data = get_data('week_shipments_quantity.csv')
 
-# split data into features and target
-features, target = get_features_target(data)
+def prepare_model(iterations, get_score=False, show_statistics=True ):
+    # get data from CSV
+    data = get_csv_data("week_shipments_quantity.csv")
 
-# get train and test data from features and target
-X_train, X_test, y_train, y_test = get_train_test(features, target)
+    # split data into features and target
+    features, target = get_features_target(data)
 
-# do the magic measuring the time, later we can use this to compare with other estimators
-with Timer():
-    rf = get_model(X_train, y_train, estimators=500)
+    # get train and test data from features and target
+    X_train, X_test, y_train, y_test = get_train_test(features, target)
 
-# Evaluate the model
-predictions = rf.predict(X_test)
-mse = mean_squared_error(y_test, predictions)
-print("Mean Squared Error:", mse)
-print("Root Mean Squared Error:", mse**(1/2))
-print("Score:", rf.score(X_test, y_test))
+    # do the magic measuring the time, later we can use this to compare with other estimators
+    with Timer() as timer:
+        rf = get_model(X_train, y_train, estimators=iterations)
 
-print('--------------------------------------------------------------------------------')
-# now lets see hackathon week but in 2024
-# Set the new data to predict
-new_data_from_csv = get_data('to_predict.csv', to_learn=False)
-new_data_to_predict, _ = get_features_target(new_data_from_csv, to_learn=False)
+    if get_score:
+        print(f"fit time: {timer}")
+        # Evaluate the model
+        predictions = rf.predict(X_test)
+                    
+        if show_statistics:
+            # Calculate the mean squared error
+            print("Statics for:", iterations)
+            mse = mean_squared_error(y_test, predictions)
+            print("Mean Squared Error:", mse)
+            print("Root Mean Squared Error:", mse ** (1 / 2))
+            print("Score:", rf.score(X_test, y_test))
+
+        return rf, rf.score(X_test, y_test)
+
+        
+
+    return rf
 
 
-company_encoder = joblib.load('company_encoder.pkl')
-warehouse_encoder = joblib.load('warehouse_encoder.pkl')
 
+def predict(week, year, warehouseID, companyName):
+    # Convert the parameters to a DataFrame
+    data = pd.DataFrame(
+        {
+            "week": [week],
+            "year": [year],
+            "warehouseID": [warehouseID],
+            "companyName": [companyName],
+        }
+    )
+    company_encoder = joblib.load("company_encoder.pkl")
+    warehouse_encoder = joblib.load("warehouse_encoder.pkl")
 
-for index, row in new_data_from_csv.iterrows():
-    # Get the 'warehouseID' and 'companyName' for the current row
-    warehouseID = row['warehouseID']
-    companyName = row['companyName']
+    # Encode 'warehouseID' and 'companyName'
+    data["warehouseID"] = warehouse_encoder.transform([warehouseID])
+    data["companyName"] = company_encoder.transform([companyName])
 
-    original_warehouseID = warehouse_encoder.inverse_transform([warehouseID])[0]
-    original_companyName = company_encoder.inverse_transform([companyName])[0]
+    # Extract features from the data
+    features, _ = get_features_target(data, to_learn=False)
+
+    # Make a prediction
+    prediction = rf.predict(features)
+
+    print(f"Predicted for {companyName} warehouse {warehouseID} on the week {week} of {year} count: {prediction[0]}")
     
-    # Make a prediction for the current row
-    prediction = rf.predict([new_data_to_predict[index]])
+    return prediction[0]
 
-    # Print the prediction
-    print(f'Prediction for week {row["week"]} of year {row["year"]}, warehouse {original_warehouseID} and company {original_companyName}: {prediction[0]}')
+
+tries = [200, 225, 250, 275 ,300]
+
+
+scores = {}
+for t in tries:
+    print(f"--------------------------------{t}---------------------------------------")
+    rf, score = prepare_model(t, get_score=True, show_statistics=True)
+    scores[t] = score
+    
+print(scores)
+
+# Make a prediction
+# LLC_prediction = predict(
+#     week=45,
+#     year=2024,
+#     warehouseID="8af560db-84eb-4504-bd94-6a933c44945e",
+#     companyName="EMP Strategies LLC",
+# )
+
