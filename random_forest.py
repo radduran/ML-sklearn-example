@@ -96,12 +96,11 @@ def get_data(filename, to_learn=True):
 def get_features_target(data, to_learn=True):
     print('get feature and target')
     # Prepare data features (inputs) and output(target)
-    features = data[["week", "year"] + list(data.columns[5:])].values
-    target = None
-    if to_learn:
-        target = data["count"]
-        
-    return features, target
+    features = data[["week", "year","companyName","warehouseID"]].values
+    if not to_learn:
+        return features, None
+    return features,  data["count"]
+
 
 
 def get_train_test(features, target):
@@ -156,5 +155,20 @@ new_data_from_csv = get_data('to_predict.csv', to_learn=False)
 new_data_to_predict, _ = get_features_target(new_data_from_csv, to_learn=False)
 
 
-new_prediction = rf.predict(new_data_to_predict)
-print(f'prediction for 2024 week 1: {new_prediction}')
+company_encoder = joblib.load('company_encoder.pkl')
+warehouse_encoder = joblib.load('warehouse_encoder.pkl')
+
+
+for index, row in new_data_from_csv.iterrows():
+    # Get the 'warehouseID' and 'companyName' for the current row
+    warehouseID = row['warehouseID']
+    companyName = row['companyName']
+
+    original_warehouseID = warehouse_encoder.inverse_transform([[warehouseID]])[0]
+    original_companyName = company_encoder.inverse_transform([[companyName]])[0]
+    
+    # Make a prediction for the current row
+    prediction = rf.predict([new_data_to_predict[index]])
+
+    # Print the prediction
+    print(f'Prediction for week {row["week"]} of year {row["year"]}, warehouse {warehouseID} and company {companyName}: {prediction[0]}')
